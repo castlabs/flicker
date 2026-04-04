@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Flicker test</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+  <style>
+    @font-face {
+      font-family: NNGI;
+      src: url("../nngi-regular.otf") format("opentype");
+    }
+
+    @font-face {
+      font-family: NNGI;
+      font-weight: 700;
+      src: url("../nngi-bold.otf") format("opentype");
+    }
+
+    body {
+      margin: 0 0 0 16px;
+      font: 16px/1.4 NNGI, sans-serif;
+    }
+
+    img {
+      display: block;
+      width: calc(100vw - 16px);
+      height: 100vh;
+      object-fit: contain;
+      object-position: left top;
+    }
+
+    .row {
+      margin: 8px 0;
+    }
+
+    label {
+      display: block;
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+  <div class="row"><strong id="statusText">Showing A</strong></div>
+
+  <img id="flipImage" src="./stem-org.jpg" alt="flipper">
+  <div class="row"><button id="fullscreenButton" type="button">Go fullscreen</button></div>
+
+  <div class="row">
+    <label for="intervalInput">Flip interval: <span id="intervalValue">1500</span> ms</label>
+    <input id="intervalInput" type="range" min="200" max="5000" step="100" value="1500">
+  </div>
+
+  <div class="row">
+    <label for="imageAFileInput">Image A file</label>
+    <input id="imageAFileInput" type="file" accept="image/*">
+
+    <label for="imageAUrlInput">Image A URL</label>
+    <input id="imageAUrlInput" type="url" placeholder="https://...">
+  </div>
+
+  <div class="row">
+    <label for="imageBFileInput">Image B file</label>
+    <input id="imageBFileInput" type="file" accept="image/*">
+
+    <label for="imageBUrlInput">Image B URL</label>
+    <input id="imageBUrlInput" type="url" placeholder="https://...">
+  </div>
+
+  <div class="row" style="margin-top:32px"><a href="https://github.com/vitaly-castLabs/flicker" target="_blank" rel="noopener noreferrer">GitHub</a></div>
+
+  <script>
+    const defaultSources = {
+      a: "./stem-org.jpg",
+      b: "./stem-os.jpg"
+    };
+
+    const state = {
+      showingA: true,
+      intervalMs: 1500,
+      timerId: 0,
+      sources: { ...defaultSources },
+      objectUrls: { a: null, b: null }
+    };
+
+    const elements = {
+      image: document.getElementById("flipImage"),
+      fullscreenButton: document.getElementById("fullscreenButton"),
+      status: document.getElementById("statusText"),
+      intervalInput: document.getElementById("intervalInput"),
+      intervalValue: document.getElementById("intervalValue"),
+      imageAFileInput: document.getElementById("imageAFileInput"),
+      imageBFileInput: document.getElementById("imageBFileInput"),
+      imageAUrlInput: document.getElementById("imageAUrlInput"),
+      imageBUrlInput: document.getElementById("imageBUrlInput")
+    };
+
+    function getFileInput(imageKey) {
+      return imageKey === "a" ? elements.imageAFileInput : elements.imageBFileInput;
+    }
+
+    function getUrlInput(imageKey) {
+      return imageKey === "a" ? elements.imageAUrlInput : elements.imageBUrlInput;
+    }
+
+    function releaseObjectUrl(imageKey) {
+      if (state.objectUrls[imageKey]) {
+        URL.revokeObjectURL(state.objectUrls[imageKey]);
+        state.objectUrls[imageKey] = null;
+      }
+    }
+
+    function updateImageSource(imageKey) {
+      const fileInput = getFileInput(imageKey);
+      const urlInput = getUrlInput(imageKey);
+
+      releaseObjectUrl(imageKey);
+
+      if (fileInput.files && fileInput.files[0]) {
+        state.objectUrls[imageKey] = URL.createObjectURL(fileInput.files[0]);
+        state.sources[imageKey] = state.objectUrls[imageKey];
+        return;
+      }
+
+      state.sources[imageKey] = urlInput.value.trim() || defaultSources[imageKey];
+    }
+
+    function updateAllSources() {
+      updateImageSource("a");
+      updateImageSource("b");
+    }
+
+    function render() {
+      const currentLabel = state.showingA ? "A" : "B";
+      const currentKey = currentLabel.toLowerCase();
+      elements.image.src = state.sources[currentKey];
+      elements.status.textContent = `Showing ${currentLabel}`;
+    }
+
+    function restartTimer() {
+      clearInterval(state.timerId);
+      state.timerId = setInterval(function () {
+        state.showingA = !state.showingA;
+        render();
+      }, state.intervalMs);
+    }
+
+    function handleSourceInputChange() {
+      updateAllSources();
+      render();
+    }
+
+    [
+      elements.imageAFileInput,
+      elements.imageBFileInput,
+      elements.imageAUrlInput,
+      elements.imageBUrlInput
+    ].forEach(function (input) {
+      input.addEventListener("change", handleSourceInputChange);
+      input.addEventListener("input", handleSourceInputChange);
+    });
+
+    elements.intervalInput.addEventListener("input", function () {
+      state.intervalMs = Number(elements.intervalInput.value);
+      elements.intervalValue.textContent = String(state.intervalMs);
+      restartTimer();
+    });
+
+    function goFullscreen() {
+      if (elements.image.requestFullscreen) {
+        elements.image.requestFullscreen();
+      }
+    }
+
+    elements.fullscreenButton.addEventListener("click", goFullscreen);
+    elements.image.addEventListener("dblclick", goFullscreen);
+
+    window.addEventListener("beforeunload", function () {
+      releaseObjectUrl("a");
+      releaseObjectUrl("b");
+    });
+
+    updateAllSources();
+    render();
+    restartTimer();
+  </script>
+</body>
+</html>
