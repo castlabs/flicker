@@ -4,9 +4,9 @@ Minimal image quality flicker tool: flip between original and compressed images,
 
 ## Demo
 
-[![Animated flicker demo comparing the original bunny with a heavily JPEG-quantized version](./flicker-demo.gif)](https://vitaly-castlabs.github.io/flicker/)
+[![Animated flicker demo comparing the original bunny with a heavily JPEG-quantized version](./flicker-demo.gif)](https://castlabs.github.io/flicker/)
 
-[Open the live demo](https://vitaly-castlabs.github.io/flicker/)
+[Open the live demo](https://castlabs.github.io/flicker/)
 
 ## Features
 
