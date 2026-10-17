@@ -12,6 +12,10 @@ Minimal image quality flicker tool: flip between original and compressed images,
 
 - Alternates between two images (`A` and `B`)
 - Adjustable flip interval (`200ms` to `5000ms`)
+- Zoom with the +/− buttons in steps: 1/8×, 1/4×, 1/2×, 1×, 2×, 4×, 8× (1× is actual image size)
+- Drag to pan; zoom and pan stay in place while images alternate
+- Semi-transparent zoom panel; drag it to reposition it
+- Page scrolling works normally over the image
 - Per-image source selection:
   - local upload
   - URL
@@ -19,6 +23,7 @@ Minimal image quality flicker tool: flip between original and compressed images,
 - Fullscreen support:
   - `Go fullscreen` button
   - image double-click
+  - zoom and pan controls remain available in fullscreen
 
 ## Run locally
 

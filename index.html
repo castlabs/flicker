@@ -22,12 +22,67 @@
       font: 16px/1.4 NNGI, sans-serif;
     }
 
-    img {
-      display: block;
+    .viewer {
+      position: relative;
       width: calc(100vw - 16px);
+      height: calc(100vh - 48px);
+      overflow: hidden;
+      background: #fff;
+      touch-action: pan-y pinch-zoom;
+    }
+
+    .viewer:fullscreen {
+      width: 100vw;
       height: 100vh;
-      object-fit: contain;
-      object-position: left top;
+    }
+
+    .viewer.pannable {
+      cursor: grab;
+    }
+
+    .viewer.dragging {
+      cursor: grabbing;
+    }
+
+    .viewer img {
+      display: block;
+      transform-origin: left top;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .view-controls {
+      position: absolute;
+      bottom: 12px;
+      left: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      background: #fff;
+      opacity: 0.25;
+      color: #111;
+      cursor: grab;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .view-controls.dragging {
+      cursor: grabbing;
+    }
+
+    .view-controls button {
+      min-width: 36px;
+      min-height: 36px;
+      font: inherit;
+      touch-action: manipulation;
+    }
+
+    #zoomValue {
+      min-width: 4ch;
+      text-align: center;
     }
 
     .row {
@@ -43,7 +98,15 @@
 <body>
   <div class="row"><strong id="statusText">Showing A</strong></div>
 
-  <img id="flipImage" src="./stem-org.jpg" alt="flipper">
+  <div id="viewer" class="viewer" tabindex="0" role="region" aria-label="Image comparison viewer" aria-describedby="viewHelp">
+    <img id="flipImage" src="./stem-org.jpg" alt="flipper" draggable="false">
+    <div id="viewControls" class="view-controls" role="group" aria-label="View controls">
+      <button id="zoomOutButton" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+      <output id="zoomValue" aria-label="Image scale" title="1× is actual image size">1×</output>
+      <button id="zoomInButton" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+    </div>
+  </div>
+  <p id="viewHelp">Use +/− to zoom (1× is actual image size). Drag the image to pan, or drag the panel to move it. Double-click the image for fullscreen.</p>
   <div class="row"><button id="fullscreenButton" type="button">Go fullscreen</button></div>
 
   <div class="row">
@@ -80,11 +143,22 @@
       intervalMs: 1500,
       timerId: 0,
       sources: { ...defaultSources },
-      objectUrls: { a: null, b: null }
+      objectUrls: { a: null, b: null },
+      zoom: 1,
+      panX: 0,
+      panY: 0,
+      imageDrag: null,
+      panelDrag: null,
+      panelPosition: null
     };
 
     const elements = {
       image: document.getElementById("flipImage"),
+      viewer: document.getElementById("viewer"),
+      zoomOutButton: document.getElementById("zoomOutButton"),
+      zoomInButton: document.getElementById("zoomInButton"),
+      zoomValue: document.getElementById("zoomValue"),
+      viewControls: document.getElementById("viewControls"),
       fullscreenButton: document.getElementById("fullscreenButton"),
       status: document.getElementById("statusText"),
       intervalInput: document.getElementById("intervalInput"),
@@ -150,6 +224,112 @@
       render();
     }
 
+    const zoomLevels = [1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8];
+    const zoomLabels = ["1/8×", "1/4×", "1/2×", "1×", "2×", "4×", "8×"];
+
+    function updatePanelPosition() {
+      if (!state.panelPosition) return;
+      state.panelPosition.x = Math.max(0, Math.min(elements.viewer.clientWidth - elements.viewControls.offsetWidth, state.panelPosition.x));
+      state.panelPosition.y = Math.max(0, Math.min(elements.viewer.clientHeight - elements.viewControls.offsetHeight, state.panelPosition.y));
+      elements.viewControls.style.left = `${state.panelPosition.x}px`;
+      elements.viewControls.style.top = `${state.panelPosition.y}px`;
+      elements.viewControls.style.bottom = "auto";
+    }
+
+    function updateView() {
+      const width = elements.viewer.clientWidth;
+      const height = elements.viewer.clientHeight;
+      const imageWidth = elements.image.naturalWidth;
+      const imageHeight = elements.image.naturalHeight;
+
+      if (imageWidth && imageHeight) {
+        state.panX = Math.max(Math.min(0, width - imageWidth * state.zoom), Math.min(0, state.panX));
+        state.panY = Math.max(Math.min(0, height - imageHeight * state.zoom), Math.min(0, state.panY));
+      }
+
+      elements.image.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+      const zoomIndex = zoomLevels.indexOf(state.zoom);
+      elements.zoomValue.textContent = zoomLabels[zoomIndex];
+      elements.zoomOutButton.disabled = zoomIndex === 0;
+      elements.zoomInButton.disabled = zoomIndex === zoomLevels.length - 1;
+      const pannable = imageWidth * state.zoom > width || imageHeight * state.zoom > height;
+      elements.viewer.classList.toggle("pannable", pannable);
+      elements.viewer.classList.toggle("dragging", pannable && state.imageDrag !== null);
+      updatePanelPosition();
+    }
+
+    function changeZoom(direction) {
+      const nextIndex = Math.max(0, Math.min(zoomLevels.length - 1, zoomLevels.indexOf(state.zoom) + direction));
+      const nextZoom = zoomLevels[nextIndex];
+      const x = elements.viewer.clientWidth / 2;
+      const y = elements.viewer.clientHeight / 2;
+      const ratio = nextZoom / state.zoom;
+      state.panX = x - (x - state.panX) * ratio;
+      state.panY = y - (y - state.panY) * ratio;
+      state.zoom = nextZoom;
+      updateView();
+    }
+
+    elements.zoomOutButton.addEventListener("click", function () { changeZoom(-1); });
+    elements.zoomInButton.addEventListener("click", function () { changeZoom(1); });
+    elements.image.addEventListener("load", updateView);
+    window.addEventListener("resize", updateView);
+    document.addEventListener("fullscreenchange", updateView);
+
+    elements.viewer.addEventListener("pointerdown", function (event) {
+      if (event.target.closest(".view-controls") || event.button !== 0 || !event.isPrimary) return;
+      elements.viewer.focus({ preventScroll: true });
+      state.imageDrag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      elements.viewer.setPointerCapture(event.pointerId);
+      updateView();
+    });
+
+    elements.viewer.addEventListener("pointermove", function (event) {
+      if (!state.imageDrag || state.imageDrag.id !== event.pointerId) return;
+      state.panX += event.clientX - state.imageDrag.x;
+      state.panY += event.clientY - state.imageDrag.y;
+      state.imageDrag.x = event.clientX;
+      state.imageDrag.y = event.clientY;
+      updateView();
+    });
+
+    function releasePointer(event) {
+      if (!state.imageDrag || state.imageDrag.id !== event.pointerId) return;
+      state.imageDrag = null;
+      updateView();
+    }
+
+    elements.viewer.addEventListener("pointerup", releasePointer);
+    elements.viewer.addEventListener("pointercancel", releasePointer);
+    elements.viewer.addEventListener("lostpointercapture", releasePointer);
+
+    elements.viewControls.addEventListener("pointerdown", function (event) {
+      if (event.button !== 0 || !event.isPrimary || event.target.closest("button")) return;
+      state.panelPosition = { x: elements.viewControls.offsetLeft, y: elements.viewControls.offsetTop };
+      state.panelDrag = { id: event.pointerId, x: event.clientX, y: event.clientY };
+      elements.viewControls.setPointerCapture(event.pointerId);
+      elements.viewControls.classList.add("dragging");
+    });
+
+    elements.viewControls.addEventListener("pointermove", function (event) {
+      if (!state.panelDrag || state.panelDrag.id !== event.pointerId) return;
+      state.panelPosition.x += event.clientX - state.panelDrag.x;
+      state.panelPosition.y += event.clientY - state.panelDrag.y;
+      state.panelDrag.x = event.clientX;
+      state.panelDrag.y = event.clientY;
+      updatePanelPosition();
+    });
+
+    function releasePanel(event) {
+      if (!state.panelDrag || state.panelDrag.id !== event.pointerId) return;
+      state.panelDrag = null;
+      elements.viewControls.classList.remove("dragging");
+    }
+
+    elements.viewControls.addEventListener("pointerup", releasePanel);
+    elements.viewControls.addEventListener("pointercancel", releasePanel);
+    elements.viewControls.addEventListener("lostpointercapture", releasePanel);
+
     [
       elements.imageAFileInput,
       elements.imageBFileInput,
@@ -167,13 +347,17 @@
     });
 
     function goFullscreen() {
-      if (elements.image.requestFullscreen) {
-        elements.image.requestFullscreen();
+      if (elements.viewer.requestFullscreen) {
+        elements.viewer.requestFullscreen().catch(function (error) {
+          console.error("Could not enter fullscreen:", error);
+        });
       }
     }
 
     elements.fullscreenButton.addEventListener("click", goFullscreen);
-    elements.image.addEventListener("dblclick", goFullscreen);
+    elements.viewer.addEventListener("dblclick", function (event) {
+      if (!event.target.closest(".view-controls")) goFullscreen();
+    });
 
     window.addEventListener("beforeunload", function () {
       releaseObjectUrl("a");
@@ -182,6 +366,7 @@
 
     updateAllSources();
     render();
+    updateView();
     restartTimer();
   </script>
 </body>
