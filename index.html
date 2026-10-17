@@ -8,18 +8,27 @@
   <style>
     @font-face {
       font-family: NNGI;
-      src: url("../nngi-regular.otf") format("opentype");
+      src: url("./nngi-regular.ttf") format("truetype");
     }
 
     @font-face {
       font-family: NNGI;
       font-weight: 700;
-      src: url("../nngi-bold.otf") format("opentype");
+      src: url("./nngi-bold.ttf") format("truetype");
     }
 
     body {
       margin: 0 0 0 16px;
       font: 16px/1.4 NNGI, sans-serif;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    input::file-selector-button {
+      font: inherit;
     }
 
     .viewer {
@@ -64,6 +73,7 @@
       background: #fff;
       opacity: 0.25;
       color: #111;
+      font-weight: 700;
       cursor: grab;
       touch-action: none;
       user-select: none;
@@ -76,7 +86,6 @@
     .view-controls button {
       min-width: 36px;
       min-height: 36px;
-      font: inherit;
       touch-action: manipulation;
     }
 
